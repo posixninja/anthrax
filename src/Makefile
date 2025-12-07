@@ -16,37 +16,33 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 ###
  
-SDKVER = 4.0
-PLATFORM = /Developer/Platforms/iPhoneOS.platform
-SDK = $(PLATFORM)/Developer/SDKs/iPhoneOS$(SDKVER).sdk
-CC = $(PLATFORM)/Developer/usr/bin/gcc-4.2
-STRIP = $(PLATFORM)/Developer/usr/bin/strip
-LDID = /usr/local/bin/ldid
+CC ?= clang
+STRIP ?= strip
+LDID ?=
+ARCH ?=
 
-TARGETS = $(LAUNCHD_TARGET)
-
-# Setupp objects for launchd
 LAUNCHD_TARGET = launchd
-LAUNCHD_OBJECTS = launchd.o utils.o syscalls.o
-LAUNCHD_CFLAGS = -arch armv6 -isysroot=$(SDK) -I$(SDK)/usr/include -static -nostartfiles -nodefaultlibs -nostdlib -Wl,-e,_main
-LAUNCHD_LDFLAGS = 
+LAUNCHD_OBJECTS = launchd.o utils.o
+LAUNCHD_CFLAGS ?= -std=c11 -Wall -Wextra -O2 -D_DEFAULT_SOURCE
+LAUNCHD_LDFLAGS ?=
 
-PWD = $(shell pwd)
-
-%.o: %.S
-	$(CC) -c $(<) -o $(@) $(LAUNCHD_CFLAGS)
+.PHONY: all clean
 
 %.o: %.c
-	$(CC) -c $(<) -o $(@) $(LAUNCHD_CFLAGS) 
+	$(CC) $(LAUNCHD_CFLAGS) -c $< -o $@
 
-all: $(TARGETS)
+all: $(LAUNCHD_TARGET)
 
-launchd: $(LAUNCHD_OBJECTS)
-	$(CC) -o $(LAUNCHD_TARGET) $(LAUNCHD_OBJECTS) $(LAUNCHD_CFLAGS) $(LAUNCHD_LDFLAGS)
-	$(STRIP) $(LAUNCHD_TARGET)
-	ldid -S $(LAUNCHD_TARGET)
+$(LAUNCHD_TARGET): $(LAUNCHD_OBJECTS)
+ifneq ($(strip $(ARCH)),)
+	$(CC) $(LAUNCHD_CFLAGS) -march=$(ARCH) -o $@ $(LAUNCHD_OBJECTS) $(LAUNCHD_LDFLAGS)
+else
+	$(CC) $(LAUNCHD_CFLAGS) -o $@ $(LAUNCHD_OBJECTS) $(LAUNCHD_LDFLAGS)
+endif
+	$(STRIP) $@
+ifneq ($(strip $(LDID)),)
+	$(LDID) -S $@
+endif
 	
 clean:
-	rm -rf *.o launchd
-
-
+	rm -rf *.o $(LAUNCHD_TARGET)
