@@ -36,23 +36,26 @@
 #define DEVICE_OLD 2
 #define DEVICE_ATV 3
 
-char* cache_env[] = {
+static char* const cache_env[] = {
 		"DYLD_SHARED_CACHE_DONT_VALIDATE=1",
 		"DYLD_SHARED_CACHE_DIR=/System/Library/Caches/com.apple.dyld",
-		"DYLD_SHARED_REGION=private"
+		"DYLD_SHARED_REGION=private",
+		NULL
 };
 
-const char* fsck_hfs[] = { "/sbin/fsck_hfs", "-fy", "/dev/rdisk0s1", NULL };
-const char* fsck_hfs_atv[] = { "/sbin/fsck_hfs", "-fy", "/dev/rdisk0s1s1", NULL };
-const char* fsck_hfs_user[] = { "/sbin/fsck_hfs", "-fy", "/dev/rdisk0s2s1", NULL };
-const char* fsck_hfs_user_old[] = { "/sbin/fsck_hfs", "-fy", "/dev/rdisk0s2", NULL };
-const char* fsck_hfs_user_atv[] = { "/sbin/fsck_hfs", "-fy", "/dev/rdisk0s1s2", NULL };
-const char* patch_dyld_new[] = { "/usr/bin/data", "-C", "/System/Library/Caches/com.apple.dyld/dyld_shared_cache_armv7", NULL };
-const char* patch_dyld_old[] = { "/usr/bin/data", "-C", "/System/Library/Caches/com.apple.dyld/dyld_shared_cache_armv6", NULL };
-const char* patch_kernel[] = { "/usr/bin/data", "-K", NULL };
-const char* sachet[] = { "/sachet", "/Applications/Loader.app", NULL };
-const char* capable[] = { "/capable", "K48AP", "hide-non-default-apps", NULL };
-const char* afc2add[] = { "/afc2add", NULL };
+static const char* const fsck_hfs[] = { "/sbin/fsck_hfs", "-fy", "/dev/rdisk0s1", NULL };
+static const char* const fsck_hfs_atv[] = { "/sbin/fsck_hfs", "-fy", "/dev/rdisk0s1s1", NULL };
+static const char* const fsck_hfs_user[] = { "/sbin/fsck_hfs", "-fy", "/dev/rdisk0s2s1", NULL };
+static const char* const fsck_hfs_user_old[] = { "/sbin/fsck_hfs", "-fy", "/dev/rdisk0s2", NULL };
+static const char* const fsck_hfs_user_atv[] = { "/sbin/fsck_hfs", "-fy", "/dev/rdisk0s1s2", NULL };
+#ifdef INSTALL_UNTETHERED
+static const char* const patch_dyld_new[] = { "/usr/bin/data", "-C", "/System/Library/Caches/com.apple.dyld/dyld_shared_cache_armv7", NULL };
+static const char* const patch_dyld_old[] = { "/usr/bin/data", "-C", "/System/Library/Caches/com.apple.dyld/dyld_shared_cache_armv6", NULL };
+static const char* const patch_kernel[] = { "/usr/bin/data", "-K", NULL };
+#endif
+static const char* const sachet[] = { "/sachet", "/Applications/Loader.app", NULL };
+static const char* const capable[] = { "/capable", "K48AP", "hide-non-default-apps", NULL };
+static const char* const afc2add[] = { "/afc2add", NULL };
 
 static char** envp = NULL;
 
@@ -84,7 +87,7 @@ int install_files(int device) {
 #endif
 
 #ifdef INSTALL_HACKTIVATION
-	if(!is_old) {
+	if(device != DEVICE_OLD) {
 		puts("Installing hacktivate.dylib...\n");
 		ret = install("/files/hacktivate.dylib", "/mnt/usr/lib/hacktivate.dylib", 0, 80, 0755);
 		if (ret < 0) return ret;
@@ -169,7 +172,7 @@ int install_files(int device) {
 	if (ret < 0) return -1;
 
 	puts("Installing libgmalloc\n");
-	if(is_old) {
+	if(device == DEVICE_OLD) {
 		fsexec(patch_dyld_old, cache_env);
 	} else {
 		fsexec(patch_dyld_new, cache_env);
@@ -205,6 +208,8 @@ int install_files(int device) {
 }
 
 int main(int argc, char* argv[], char* env[]) {
+	(void)argc;
+	(void)argv;
 	int ret = 0;
 	int device = 0;
 	struct stat status;
@@ -234,7 +239,11 @@ int main(int argc, char* argv[], char* env[]) {
 	puts("Filesystem mounted\n");
 
 	puts("Mounting devices...\n");
-	if (mount("devfs", "/mnt/dev", 0, NULL) != 0) {
+#if defined(__APPLE__)
+if (mount("devfs", "/mnt/dev", 0, NULL) != 0) {
+#else
+if (mount("devtmpfs", "/mnt/dev", "devtmpfs", 0, NULL) != 0) {
+#endif
 		puts("Unable to mount devices!\n");
 		unmount("/mnt", 0);
 		return -1;

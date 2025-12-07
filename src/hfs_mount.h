@@ -33,8 +33,11 @@
 #ifndef _HFS_MOUNT_H_
 #define _HFS_MOUNT_H_
 
+#ifdef __APPLE__
 #include <sys/appleapiopts.h>
+#endif
 
+#include <sys/types.h>
 #include <sys/mount.h>
 #include <sys/time.h>
 
@@ -65,6 +68,18 @@ struct hfs_mount_args {
 #define HFSFSMNT_NOXONFILES	0x1	/* disable execute permissions for files */
 #define HFSFSMNT_WRAPPER	0x2	/* mount HFS wrapper (if it exists) */
 #define HFSFSMNT_EXTENDED_ARGS  0x4     /* indicates new fields after "flags" are valid */
+
+#ifndef MNT_RDONLY
+#define MNT_RDONLY 0
+#endif
+
+#ifndef MNT_ROOTFS
+#define MNT_ROOTFS 0
+#endif
+
+#ifndef MNT_UPDATE
+#define MNT_UPDATE 0
+#endif
 
 /*
  * Sysctl values for HFS

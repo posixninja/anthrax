@@ -18,6 +18,7 @@
   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  **/
 
+#include <string.h>
 #include "utils.h"
 #include "syscalls.h"
 #include "hfs_mount.h"
@@ -45,11 +46,6 @@ int install(const char* src, const char* dst, int uid, int gid, int mode) {
 	return 0;
 }
 
-void sleep(unsigned int seconds) {
-	int i = 0;
-	for(i = seconds * 10000000; i > 0; i--) {}
-}
-
 void _puts(const char* s) {
 	while((*s) != '\0') {
 		write(1, s, 1);
@@ -67,15 +63,16 @@ void _putc(const char c) {
 void puti(unsigned int integer) {
 	int i = 0;
 	char nyble = 0;
+	const char* digits = "0123456789abcdef";
 
 	for(i = 7; i >= 0; i--) {
 		nyble = (integer >> (4 * i)) & 0xF;
-		putc(nyble+0x30);
+		putc(digits[(int)nyble]);
 	}
 }
 
 int cp(const char *src, const char *dest) {
-	int count = 0;
+	ssize_t count = 0;
 	char buf[0x800];
 	struct stat status;
 
@@ -89,7 +86,7 @@ int cp(const char *src, const char *dest) {
 		return -1;
 	}
 
-	int out = open(dest, O_WRONLY | O_CREAT, 0);
+	int out = open(dest, O_WRONLY | O_CREAT | O_TRUNC, 0644);
 	if (out < 0) {
 		close(in);
 		return -1;
@@ -114,11 +111,27 @@ int cp(const char *src, const char *dest) {
 
 int hfs_mount(const char* device, const char* mountdir, int options) {
 	struct hfs_mount_args args;
-	args.fspec = device;
+	memset(&args, 0, sizeof(args));
+	args.fspec = (char *)device;
+#if defined(__APPLE__)
 	return mount("hfs", mountdir, options, &args);
+#else
+	unsigned long linux_flags = 0;
+#ifdef MS_RDONLY
+	if (options & MNT_RDONLY) {
+		linux_flags |= MS_RDONLY;
+	}
+#endif
+#ifdef MS_REMOUNT
+	if (options & MNT_UPDATE) {
+		linux_flags |= MS_REMOUNT;
+	}
+#endif
+	return mount(device, mountdir, "hfs", linux_flags, NULL);
+#endif
 }
 
-int fsexec(char* argv[], char* env[]) {
+int fsexec(const char* const argv[], char* const env[]) {
 	if(vfork() != 0) {
 		while(wait4(-1, NULL, WNOHANG, NULL) <= 0) {
 			sleep(1);
@@ -128,41 +141,18 @@ int fsexec(char* argv[], char* env[]) {
 		if (chroot("/mnt") != 0) {
 			return -1;
 		}
-		execve(argv[0], argv, env);
+		execve(argv[0], (char* const*)argv, env);
 	}
 	return 0;
 }
 
-int exec(char* argv[], char* env[]) {
+int exec(const char* const argv[], char* const env[]) {
 	if(vfork() != 0) {
 		while(wait4(-1, NULL, WNOHANG, NULL) <= 0) {
 			sleep(1);
 		}
 	} else {
-		execve(argv[0], argv, env);
+		execve(argv[0], (char* const*)argv, env);
 	}
 	return 0;
-}
-
-int _strlen(const char* s) {
-	int i = 0;
-	for(i = 0; i >= 0; i++) {
-		if(s[i] == '\0') return i;
-	}
-	return -1;
-}
-
-void* memcpy(char* s1, const char* s2, int n) {
-	int i = 0;
-	for(i = 0; i < n; i++) {
-		s1[i] = s2[i];
-	}
-	return s1;
-}
-
-void* memset(char *b, int c, int len) {
-	int i = 0;
-	for(i = 0; i < len; i++) {
-		b[i] = c;
-	}
 }
